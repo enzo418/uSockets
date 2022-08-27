@@ -27,12 +27,28 @@ file(GLOB SRCS
 
 # includes
 # ---------
-message(${CMAKE_CURRENT_LIST_DIR})
 include_directories(src)
 
+# library
+# -------
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 
 add_library(usocketslib ${SRCS})
+
+# LTO optimization
+# -----------------
+include(CheckIPOSupported)
+check_ipo_supported(RESULT supported OUTPUT error)
+
+if(supported)
+    message(STATUS "LTO enabled")
+    set_property(TARGET usocketslib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+else()
+    message(STATUS "LTO not supported: <${error}>")
+endif()
+
+# clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # WITH_BORINGSSL => unsopported (we need to fork it and add cmake support)
 
@@ -49,6 +65,7 @@ if(WITH_OPENSSL)
         # SSL -> system openssl installation (e.g. libssl-dev)
         # crypto -> uSockets -> crypto library
         target_link_libraries(usocketslib ${OPENSSL_LIBRARIES} "-lcrypto" "-lstdc++")
+        message(STATUS "With OPENSSL")
 elseif(WITH_WOLFSSL)
         # Not recommended, uSockets seems to miss something while using this
         # WITH_WOLFSSL=ON enables WolfSSL 4.2.0 support (mutually exclusive with OpenSSL)
@@ -58,9 +75,10 @@ elseif(WITH_WOLFSSL)
         include_directories(${WOLFSSL_INCLUDE_DIRS})
         target_compile_definitions(usocketslib PUBLIC LIBUS_USE_WOLFSSL)
         target_link_libraries(usocketslib PkgConfig::wolfssl)
+        message(STATUS "With WOLFSSL")
 else() # NO SSL
         target_compile_definitions(usocketslib PUBLIC LIBUS_NO_SSL)
-        message("No SSL!")
+        message(STATUS "SSL Disabled")
 endif()
 
 if(WITH_BORINGSSL OR WITH_ASIO OR WITH_QUIC)
@@ -85,6 +103,3 @@ if(WITH_QUIC)
 endif()
 
 set (CMAKE_CXX_STANDARD 17) # clangd cries if we remove this since the code uses std::string_view
-
-# clangd
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
