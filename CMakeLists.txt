@@ -6,27 +6,85 @@ cmake_minimum_required(VERSION 3.12)
 
 project(uSockets VERSION 1.0.0)
 
+# options
+# -------
+option(WITH_OPENSSL "Enable SSL support - Not compatible with WOLFSSL option")
+option(WITH_WOLFSSL "Enable SSL support - Not compatible with OPENSSL option")
+
+option(WITH_QUIC "Use QUIC protocol")
+option(WITH_ASIO "Use ASIO")
+
+# src files
+# ---------
 file(GLOB SRCS 
-        ${CMAKE_CURRENT_LIST_DIR}/src/*.c 
-        ${CMAKE_CURRENT_LIST_DIR}/src/eventing/*.c 
-        ${CMAKE_CURRENT_LIST_DIR}/src/crypto/*.c
-        ${CMAKE_CURRENT_LIST_DIR}/src/crypto/*.cpp
+        src/*.c 
+        # there is no problem in including these files below as they
+        # hide the code behind c macros with their respective flag.
+        src/eventing/*.c  
+        src/crypto/*.c 
+        src/crypto/*.cpp
 )
 
-include_directories(${CMAKE_CURRENT_LIST_DIR}/src)
-include_directories(${CMAKE_CURRENT_LIST_DIR}/uSockets/src)
+# includes
+# ---------
+message(${CMAKE_CURRENT_LIST_DIR})
+include_directories(src)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 
-# By default we build the uSockets.a static library
 add_library(usocketslib ${SRCS})
 
-target_link_libraries(usocketslib "-lssl" "-lcrypto" "-lstdc++")
+# WITH_BORINGSSL => unsopported (we need to fork it and add cmake support)
 
-# LIBUS_NO_SSL
-target_compile_definitions(usocketslib PUBLIC LIBUS_USE_OPENSSL)
+# Applied options
+# ---------------
+if(WITH_OPENSSL)
+        # RECOMMENDED! WITH_OPENSSL=ON enables OpenSSL 1.1+ support
+        find_package(OpenSSL REQUIRED)
+        
+        include_directories(${OPENSSL_INCLUDE_DIR})
 
-set (CMAKE_CXX_STANDARD 17)
+        target_compile_definitions(usocketslib PUBLIC LIBUS_USE_OPENSSL)
+
+        # SSL -> system openssl installation (e.g. libssl-dev)
+        # crypto -> uSockets -> crypto library
+        target_link_libraries(usocketslib ${OPENSSL_LIBRARIES} "-lcrypto" "-lstdc++")
+elseif(WITH_WOLFSSL)
+        # Not recommended, uSockets seems to miss something while using this
+        # WITH_WOLFSSL=ON enables WolfSSL 4.2.0 support (mutually exclusive with OpenSSL)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(wolfssl REQUIRED IMPORTED_TARGET wolfssl)
+        
+        include_directories(${WOLFSSL_INCLUDE_DIRS})
+        target_compile_definitions(usocketslib PUBLIC LIBUS_USE_WOLFSSL)
+        target_link_libraries(usocketslib PkgConfig::wolfssl)
+else() # NO SSL
+        target_compile_definitions(usocketslib PUBLIC LIBUS_NO_SSL)
+        message("No SSL!")
+endif()
+
+if(WITH_BORINGSSL OR WITH_ASIO OR WITH_QUIC)
+        # add pthread
+        set(THREADS_PREFER_PTHREAD_FLAG ON)
+        find_package(Threads REQUIRED)
+        target_link_libraries(usocketslib PRIVATE Threads::Threads)
+endif()
+
+if(WITH_ASIO)
+        target_sources(usocketslib PRIVATE src/eventing/asio.cpp)
+        target_compile_definitions(usocketslib PUBLIC LIBUS_USE_ASIO)
+endif()
+
+if(WITH_QUIC)
+        set(LSQUIC_SHARED_LIB OFF) # build static lib (without boring ssl)
+                                   # set it ON if Boring is installed, run find_packge before!
+        target_compile_definitions(usocketslib PUBLIC LIBUS_USE_QUIC)
+        include_directories(lsquic/include)
+        add_subdirectory(lsquic)
+        target_link_libraries(usocketslib "-lz" "-lm" lsquic)
+endif()
+
+set (CMAKE_CXX_STANDARD 17) # clangd cries if we remove this since the code uses std::string_view
 
 # clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
