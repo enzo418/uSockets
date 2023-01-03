@@ -389,6 +389,8 @@ struct us_socket_t *on_http_socket_timeout(struct us_socket_t *s) {
 }
 
 int main() {
+    fprintf(stderr, "Hello hammer test\n");
+    printf("Helloui\n");
     srand(time(0));
     long_buffer = calloc(long_length, 1);
 
@@ -402,7 +404,8 @@ int main() {
 
 
     // these are ignored for non-SSL
-    struct us_socket_context_options_t options = {};
+    struct us_socket_context_options_t options;
+    memset(&options, 0, sizeof(struct us_socket_context_options_t));
     options.key_file_name = "/home/alexhultman/uWebSockets.js/misc/key.pem";
     options.cert_file_name = "/home/alexhultman/uWebSockets.js/misc/cert.pem";
     options.passphrase = "1234";
@@ -436,7 +439,7 @@ int main() {
     us_socket_timeout(SSL, (struct us_socket_t *) listen_socket, 16);
 
     if (listen_socket) {
-        printf("Running hammer test\n");
+        printf("Running hammer test over tcpip\n");
         print_progress(0);
         next_connection();
 
