@@ -14,6 +14,8 @@ option(WITH_WOLFSSL "Enable SSL support - Not compatible with OPENSSL option")
 option(WITH_QUIC "Use QUIC protocol")
 option(WITH_ASIO "Use ASIO")
 
+option(usocket_INSTALL "Generate the install target" OFF)
+
 # src files
 # ---------
 file(GLOB SRCS 
@@ -103,3 +105,15 @@ if(WITH_QUIC)
 endif()
 
 set (CMAKE_CXX_STANDARD 17) # clangd cries if we remove this since the code uses std::string_view
+
+# ------------------------------------------------------ #
+#                 install lib and headers                #
+# ------------------------------------------------------ #
+if (usocket_INSTALL)
+    install(TARGETS usocketslib
+            EXPORT uSocketsTargets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+endif()
