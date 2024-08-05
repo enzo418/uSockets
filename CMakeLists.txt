@@ -104,8 +104,6 @@ if(WITH_QUIC)
         target_link_libraries(usocketslib "-lz" "-lm" lsquic)
 endif()
 
-set (CMAKE_CXX_STANDARD 17) # clangd cries if we remove this since the code uses std::string_view
-
 # ------------------------------------------------------ #
 #                 install lib and headers                #
 # ------------------------------------------------------ #
@@ -117,3 +115,11 @@ if (usocket_INSTALL)
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 endif()
+
+# find and link libuv in windows, because libusockets.h defaults to it
+if (WIN32)        
+        find_package(libuv CONFIG REQUIRED)
+        target_link_libraries(usocketslib PRIVATE $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>)
+endif()
+
+set (CMAKE_CXX_STANDARD 17) # clangd cries if we remove this since the code uses std::string_view
